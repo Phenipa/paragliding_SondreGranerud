@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,6 +17,10 @@ type metaData struct {
 
 type urlType struct {
 	URL string `json:"url"`
+}
+
+type idType struct {
+	ID string `json:"id"`
 }
 
 func genUniqueID() string {
@@ -55,9 +58,8 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 				id := genUniqueID()
 				if _, here := database[id]; !here {
 					database[id] = track
-					fmt.Fprint(w, id)
-				} else {
-					fmt.Fprint(w, "Track already in database.\n"+id)
+					ids := idType{id}
+					json.NewEncoder(w).Encode(ids)
 				}
 			} else {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -78,7 +80,7 @@ var database map[string]igc.Track
 
 func main() {
 	database = make(map[string]igc.Track)
-	http.HandleFunc("/igcinfo/api/", handlerRoot)
+	http.HandleFunc("/igcinfo/api", handlerRoot)
 	http.HandleFunc("/igcinfo/api/igc", handlerIndex)
 	http.ListenAndServe(":8080", nil)
 }
