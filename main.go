@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/marni/goigc"
+	"github.com/segmentio/ksuid"
 )
 
 type metaData struct {
@@ -17,6 +18,19 @@ type metaData struct {
 
 type urlType struct {
 	URL string `json:"url"`
+}
+
+func genUniqueID() string {
+	id := ksuid.New()
+	if len(database) == 0 {
+		return id.String()
+	}
+	for range database {
+		if _, here := database[id.String()]; !here {
+			return id.String()
+		}
+	}
+	return genUniqueID()
 }
 
 func handlerRoot(w http.ResponseWriter, r *http.Request) {
@@ -31,21 +45,22 @@ func handlerRoot(w http.ResponseWriter, r *http.Request) {
 
 func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		if r.Body == nil {
-			http.Error(w, "Request needs JSON body", http.StatusBadRequest)
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, http.StatusText(http.StatusBadRequest)+"\nRequest needs JSON body", http.StatusBadRequest)
 		} else {
 			var url urlType
 			err := json.NewDecoder(r.Body).Decode(&url)
 			track, err := igc.ParseLocation(url.URL)
 			if err == nil {
-				id := track.Pilot + track.Date.String()
-				_, ok := database[id]
-				if !ok {
+				id := genUniqueID()
+				if _, here := database[id]; !here {
 					database[id] = track
 					fmt.Fprint(w, id)
+				} else {
+					fmt.Fprint(w, "Track already in database.\n"+id)
 				}
 			} else {
-				http.Error(w, "Bad Request", http.StatusBadRequest)
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			}
 		}
 	} else if r.Method == "GET" {
@@ -55,9 +70,8 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(keys)
 	} else {
-		http.Error(w, "Not implemented yet", http.StatusNotImplemented)
+		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
 	}
-	return
 }
 
 var database map[string]igc.Track
