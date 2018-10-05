@@ -25,6 +25,14 @@ type idType struct {
 	ID string `json:"id"`
 }
 
+type jsonTrack struct {
+	Pilot       string  `json:"pilot"`
+	Hdate       string  `json:"h_date"`
+	Glider      string  `json:"glider"`
+	GliderID    string  `json:"glider_id"`
+	TrackLength float64 `json:"track_length"`
+}
+
 func genUniqueID() string {
 	id := ksuid.New()
 	if len(database) == 0 {
@@ -90,6 +98,9 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 					} else {
 						http.Error(w, http.StatusText(http.StatusBadRequest)+"\nUnknown field.", http.StatusBadRequest)
 					}
+				} else if len(parts) == 5 || parts[5] == "" {
+					jsontrack := jsonTrack{Pilot: foundTrack.Pilot, Hdate: foundTrack.Date.String(), Glider: foundTrack.GliderType, GliderID: foundTrack.GliderID, TrackLength: foundTrack.Task.Distance()}
+					json.NewEncoder(w).Encode(jsontrack)
 				}
 			} else {
 				http.Error(w, http.StatusText(http.StatusBadRequest)+"\nCould not find that track-id", http.StatusBadRequest)
