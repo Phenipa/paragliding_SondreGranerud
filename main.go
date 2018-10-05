@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/marni/goigc"
+
 	"github.com/segmentio/ksuid"
 )
 
@@ -66,11 +68,33 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else if r.Method == "GET" {
-		keys := make([]string, 0, len(database))
-		for k := range database {
-			keys = append(keys, k)
+		if parts := strings.Split(r.URL.Path, "/"); len(parts[4]) == 0 {
+			keys := make([]string, 0, len(database))
+			for k := range database {
+				keys = append(keys, k)
+			}
+			json.NewEncoder(w).Encode(keys)
+		} else {
+			if foundTrack, here := database[parts[4]]; here {
+				if parts[5] != "" {
+					if parts[5] == "pilot" {
+						fmt.Fprintln(w, foundTrack.Pilot)
+					} else if parts[5] == "h_date" {
+						fmt.Fprintln(w, foundTrack.Date.String())
+					} else if parts[5] == "glider" {
+						fmt.Fprintln(w, foundTrack.GliderType)
+					} else if parts[5] == "glider_id" {
+						fmt.Fprintln(w, foundTrack.GliderID)
+					} else if parts[5] == "track_length" {
+						fmt.Fprintln(w, foundTrack.Task.Distance())
+					} else {
+						http.Error(w, http.StatusText(http.StatusBadRequest)+"\nUnknown field.", http.StatusBadRequest)
+					}
+				}
+			} else {
+				http.Error(w, http.StatusText(http.StatusBadRequest)+"\nCould not find that track-id", http.StatusBadRequest)
+			}
 		}
-		json.NewEncoder(w).Encode(keys)
 	} else {
 		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
 	}
@@ -80,7 +104,7 @@ var database map[string]igc.Track
 
 func main() {
 	database = make(map[string]igc.Track)
-	http.HandleFunc("/igcinfo/api", handlerRoot)
-	http.HandleFunc("/igcinfo/api/igc", handlerIndex)
+	http.HandleFunc("/igcinfo/api/", handlerRoot)
+	http.HandleFunc("/igcinfo/api/igc/", handlerIndex)
 	http.ListenAndServe(":8080", nil)
 }
