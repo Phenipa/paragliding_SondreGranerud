@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/appengine"
-
 	"github.com/marni/goigc"
 
 	"github.com/segmentio/ksuid"
@@ -113,7 +111,7 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 					json.NewEncoder(w).Encode(ids)
 				}
 			} else {
-				http.Error(w, http.StatusText(http.StatusBadRequest)+"\n"+err.Error(), http.StatusBadRequest)
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			}
 		}
 	} else if r.Method == "GET" {
@@ -170,5 +168,4 @@ func main() {
 	http.HandleFunc("/igcinfo/api/", handlerRoot)
 	http.HandleFunc("/igcinfo/api/igc/", handlerIndex)
 	http.ListenAndServe(":8080", nil)
-	appengine.Main()
 }
