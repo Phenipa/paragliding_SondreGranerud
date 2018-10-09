@@ -94,16 +94,22 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 					} else if parts[5] == "glider_id" {
 						fmt.Fprintln(w, foundTrack.GliderID)
 					} else if parts[5] == "track_length" {
-						fmt.Fprintln(w, foundTrack.Task.Distance())
+						var length float64
+						for i := range foundTrack.Points {
+							if i < len(foundTrack.Points)-1 {
+								length += foundTrack.Points[i].Distance(foundTrack.Points[i+1])
+							}
+						}
+						fmt.Fprintln(w, length)
 					} else {
-						http.Error(w, http.StatusText(http.StatusBadRequest)+"\nUnknown field.", http.StatusBadRequest)
+						http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 					}
-				} else if len(parts) == 5 || parts[5] == "" {
+				} else if (len(parts) > 7 && parts[5] == "") || len(parts) == 5 {
 					jsontrack := jsonTrack{Pilot: foundTrack.Pilot, Hdate: foundTrack.Date.String(), Glider: foundTrack.GliderType, GliderID: foundTrack.GliderID, TrackLength: foundTrack.Task.Distance()}
 					json.NewEncoder(w).Encode(jsontrack)
 				}
 			} else {
-				http.Error(w, http.StatusText(http.StatusBadRequest)+"\nCould not find that track-id", http.StatusBadRequest)
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			}
 		}
 	} else {
