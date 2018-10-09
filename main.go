@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/appengine"
+
 	"github.com/marni/goigc"
 
 	"github.com/segmentio/ksuid"
@@ -168,4 +170,5 @@ func main() {
 	http.HandleFunc("/igcinfo/api/", handlerRoot)
 	http.HandleFunc("/igcinfo/api/igc/", handlerIndex)
 	http.ListenAndServe(":8080", nil)
+	appengine.Main()
 }
