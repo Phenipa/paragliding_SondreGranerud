@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/marni/goigc"
 
@@ -46,12 +48,48 @@ func genUniqueID() string {
 	return genUniqueID()
 }
 
+func uptime() string {
+	var years int
+	var months int
+	var weeks int
+	var days int
+	var hours int
+	var minutes int
+	seconds := int(time.Since(startTime).Seconds())
+	if seconds >= 60 {
+		minutes = int(seconds / 60)
+		seconds = seconds % 60
+		if minutes >= 60 {
+			hours = int(minutes / 60)
+			minutes = minutes % 60
+			if hours >= 24 {
+				days = int(hours / 24)
+				hours = hours % 24
+				if days >= 7 {
+					weeks = int(days / 7)
+					days = days % 7
+					if weeks >= 4 {
+						months = int(weeks / 4)
+						weeks = weeks % 4
+						if months >= 12 {
+							years = int(months / 12)
+							months = months % 12
+						}
+					}
+				}
+			}
+		}
+	}
+	output := "P" + strconv.Itoa(years) + "Y" + strconv.Itoa(months) + "M" + strconv.Itoa(weeks) + "W" + strconv.Itoa(days) + "DT" + strconv.Itoa(hours) + "H" + strconv.Itoa(minutes) + "M" + strconv.Itoa(seconds) + "S"
+	return output
+}
+
 func handlerRoot(w http.ResponseWriter, r *http.Request) {
 	if parts := strings.Split(r.URL.Path, "/"); parts[3] != "" {
 		http.Error(w, "404 Not found", http.StatusNotFound)
 	} else {
 		http.Header.Add(w.Header(), "content-type", "application/json")
-		meta := metaData{"v1.0", "Placeholder uptime", "Service for IGC tracks."}
+		meta := metaData{"v1.0", uptime(), "Service for IGC tracks."}
 		json.NewEncoder(w).Encode(meta)
 	}
 }
@@ -117,7 +155,12 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func init() {
+	startTime = time.Now()
+}
+
 var database map[string]igc.Track
+var startTime time.Time
 
 func main() {
 	database = make(map[string]igc.Track)
