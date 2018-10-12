@@ -149,7 +149,7 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 					json.NewEncoder(w).Encode(jsontrack)
 				}
 			} else {
-				http.Error(w, http.StatusTextl(http.StatusNotFound), http.StatusNotFound)
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			}
 		}
 	} else {
