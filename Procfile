@@ -1,1 +1,1 @@
-web: go run
+web: igcinfo_SondreGranerud
