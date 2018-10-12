@@ -144,12 +144,12 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 					} else {
 						http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 					}
-				} else if (len(parts) > 7 && parts[5] == "") || len(parts) == 5 {
+				} else if len(parts) == 5 || parts[5] == "" {
 					jsontrack := jsonTrack{Pilot: foundTrack.Pilot, Hdate: foundTrack.Date.String(), Glider: foundTrack.GliderType, GliderID: foundTrack.GliderID, TrackLength: foundTrack.Task.Distance()}
 					json.NewEncoder(w).Encode(jsontrack)
 				}
 			} else {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				http.Error(w, http.StatusTextl(http.StatusNotFound), http.StatusNotFound)
 			}
 		}
 	} else {
