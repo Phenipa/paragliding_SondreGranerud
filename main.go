@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -167,5 +168,5 @@ func main() {
 	database = make(map[string]igc.Track)
 	http.HandleFunc("/igcinfo/api/", handlerRoot)
 	http.HandleFunc("/igcinfo/api/igc/", handlerIndex)
-	http.ListenAndServe(":80", nil)
+	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 }
