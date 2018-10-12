@@ -1,1 +1,1 @@
-web: gorun
+web: go run
