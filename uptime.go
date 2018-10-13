@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-func uptime() string {
+func uptime() string { //This function outputs the uptime of the application based on the global variable "startTime"
 	var years, months, weeks, days, hours, minutes int
 	seconds := int(time.Since(startTime).Seconds())
-	if seconds >= 60 {
+	if seconds >= 60 { //This if-sequence appropriately sets all times such that it conforms to the ISO8601-standard
 		minutes = int(seconds / 60)
 		seconds = seconds % 60
 		if minutes >= 60 {
@@ -33,5 +33,5 @@ func uptime() string {
 		}
 	}
 	output := "P" + strconv.Itoa(years) + "Y" + strconv.Itoa(months) + "M" + strconv.Itoa(weeks) + "W" + strconv.Itoa(days) + "DT" + strconv.Itoa(hours) + "H" + strconv.Itoa(minutes) + "M" + strconv.Itoa(seconds) + "S"
-	return output
+	return output //Output is formatted to fit the ISO8601-standard
 }
