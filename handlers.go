@@ -82,13 +82,17 @@ func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 		return
 	}
 	c := session.DB("paragliding_igc").C("tracks")
-	var indexes jsonTrack
+	var indexes []jsonTrack
 	err = c.Find(nil).All(&indexes)
 	if err != nil {
 		log.Fatal("Could not find indexes: ", err)
 	}
 	session.Close()
-	json.NewEncoder(w).Encode(indexes)
+	ids := make([]string, len(indexes))
+	for i := range indexes {
+		ids[i] = indexes[i].ID
+	}
+	json.NewEncoder(w).Encode(ids)
 }
 
 func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
