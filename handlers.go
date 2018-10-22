@@ -86,7 +86,14 @@ func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 }
 
 func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	getTrackSession := session.Copy()
+	c := getTrackSession.DB(databaseName).C(collectionName)
+	var result jsonTrack
+	err := c.FindId(p.ByName("id")).One(&result)
+	if err != nil {
+		log.Fatal("Could not find provided track: ", err)
+	}
+	json.NewEncoder(w).Encode(result)
 }
 
 func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
