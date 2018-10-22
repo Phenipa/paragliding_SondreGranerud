@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 	"github.com/segmentio/ksuid"
 )
 
