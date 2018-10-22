@@ -2,84 +2,137 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
-	"strings"
+	"os"
 
+	"github.com/globalsign/mgo"
+	"github.com/julienschmidt/httprouter"
 	igc "github.com/marni/goigc"
+	"github.com/globalsign/mgo/bson"
 )
 
-func handlerRoot(w http.ResponseWriter, r *http.Request) { //Handles /igcinfo/api/
-	if parts := strings.Split(r.URL.Path, "/"); parts[3] != "" { //Check that the url is valid
-		http.Error(w, "404 Not found", http.StatusNotFound)
-	} else {
-		http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
-		meta := metaData{"v1.0", uptime(), "Service for IGC tracks."}   //Create an object which contains response
-		json.NewEncoder(w).Encode(meta)                                 //Encode response to json and respond
-	}
+type metaData struct { //Output for /paragliding/api
+	Version string `json:"name"`
+	Uptime  string `json:"uptime"`
+	Info    string `json:"info"`
 }
 
-func handlerIndex(w http.ResponseWriter, r *http.Request) { //Handles /igcinfo/api/igc/
-	if r.Method == "POST" { //If request is POST
-		if r.Header.Get("Content-Type") != "application/json" { //If request is not of type JSON
-			http.Error(w, http.StatusText(http.StatusBadRequest)+"\nRequest needs JSON body", http.StatusBadRequest) //Respond that the request needs to be correctly formatted
-		} else {
-			var url urlType                             //Initiate a url-helper-type
-			err := json.NewDecoder(r.Body).Decode(&url) //Decode content of request (the url which was posted)
-			track, err := igc.ParseLocation(url.URL)    //Use goigc-library to extract a track from the url that was provided
-			if err == nil {                             //If the url is deemed valid by goigc
-				id := genUniqueID()                 //Generate an id for this track
-				if _, here := database[id]; !here { //Final check to ensure id is not already in database (this should be unnecessary as the genUniqueId function already makes this check)
-					//This does not ensure that the track is not already in the database. The ids I generate make it such that I would need to parse the whole database
-					//and ensure all contents of existing tracks do not match the track which is being added. I deemed it unnecessary to do this, even though I risk
-					//filling the database with exclusively repeat-data.
-					database[id] = track                                            //Add the track to the database
-					ids := idType{id}                                               //Put the id into a struct to ready it for response
-					http.Header.Add(w.Header(), "content-type", "application/json") //Set response header to reflect the content being JSON
-					json.NewEncoder(w).Encode(ids)                                  //Generate response (the id which was given to the track that was POSTed)
-				}
-			} else {
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest) //Handles bad requests
-			}
-		}
-	} else if r.Method == "GET" { //If request is GET
-		if parts := strings.Split(r.URL.Path, "/"); len(parts[4]) == 0 { //Checks the incoming URL-path to route the request appropriately
-			keys := make([]string, 0, len(database)) //Ready an array to hold all ids that are present in the database.
-			for k := range database {                //Parse the database and extract the keys
-				keys = append(keys, k) //Put the keys into the array
-			}
-			json.NewEncoder(w).Encode(keys) //Encode the response into a JSON-array and respond
-		} else { //If the GET-request is /igcinfo/api/<id>/ or its sub-paths
-			if foundTrack, here := database[parts[4]]; here { //If the id exists in the database
-				if parts[5] != "" { //If the GET-request is /igcinfo/api/<id>/<field>
-					if parts[5] == "pilot" { //Handle the <field> path and respond accordingly
-						fmt.Fprintln(w, foundTrack.Pilot)
-					} else if parts[5] == "h_date" {
-						fmt.Fprintln(w, foundTrack.Date.String())
-					} else if parts[5] == "glider" {
-						fmt.Fprintln(w, foundTrack.GliderType)
-					} else if parts[5] == "glider_id" {
-						fmt.Fprintln(w, foundTrack.GliderID)
-					} else if parts[5] == "track_length" {
-						var length float64
-						for i := range foundTrack.Points {
-							if i < len(foundTrack.Points)-1 {
-								length += foundTrack.Points[i].Distance(foundTrack.Points[i+1])
-							}
-						}
-						fmt.Fprintln(w, length)
-					} else { //Requested path was not found i.e. /igcinfo/api/igc/<valid id>/<gibberish>
-						http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-					}
-				} else if parts[5] == "" || len(parts) == 5 { //If the requested path is exactly /igcinfo/api/igc/<id>
-					jsontrack := jsonTrack{Pilot: foundTrack.Pilot, Hdate: foundTrack.Date.String(), Glider: foundTrack.GliderType, GliderID: foundTrack.GliderID, TrackLength: foundTrack.Task.Distance()}
-					json.NewEncoder(w).Encode(jsontrack) //Format all information and respond
-				}
-			} else {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound) //Requested path is invalid
-			}
-		}
-	} else {
-		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented) //Request-type is not handled. This is the case if r.Method is not either GET or POST
+type jsonTrack struct { //Helper-struct to appropriately respond with data about a requested track.
+	Pilot       string  `json:"pilot"`
+	Hdate       string  `json:"h_date"`
+	Glider      string  `json:"glider"`
+	GliderID    string  `json:"glider_id"`
+	TrackLength float64 `json:"track_length"`
+	URL         string  `json:"url"`
+	_ID 		bson.ObjectId `json:"id"`
+}
+
+func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
+	meta := metaData{"v1.0", uptime(), "Service for IGC tracks."}   //Create an object which contains response
+	json.NewEncoder(w).Encode(meta)                                 //Encode response to json and respond
+}
+
+func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if r.Header.Get("Content-Type") != "application/json" { //If request is not of type JSON
+		http.Error(w, http.StatusText(http.StatusBadRequest)+"\nRequest needs JSON body", http.StatusBadRequest) //Respond that the request needs to be correctly formatted
+		return
 	}
+	var track jsonTrack
+	err := json.NewDecoder(r.Body).Decode(&track)
+	if err != nil {
+		log.Fatal("Decoding of URL failed ", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	trackFile, err := igc.ParseLocation(track.URL)
+	if err != nil {
+		log.Fatal("Track parsing failed: ", err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	track.Pilot = trackFile.Pilot
+	track.Hdate = trackFile.Date.String()
+	track.Glider = trackFile.GliderType
+	track.GliderID = trackFile.GliderID
+	var length float64
+	for i := range trackFile.Points {
+		if i < len(trackFile.Points)-1 {
+			length += trackFile.Points[i].Distance(trackFile.Points[i+1])
+		}
+	}
+	track.TrackLength = length
+	track._ID = bson.NewObjectId()
+	os.Setenv("DBURL", "mongodb://access:paragl1ding_access@ds237363.mlab.com:37363/paragliding_igc")
+	session, err := mgo.Dial(os.Getenv("DBURL"))
+	if err != nil {
+		log.Fatal("Database-connection could not be made: ", err)
+	}
+	c := session.DB("paragliding_igc").C("tracks")
+	err = c.Insert(track)
+	if err!= nil {
+		log.Fatal("Track could not be inserted: ", err)
+		return
+	}
+	session.Close()
+	json.NewEncoder(w).Encode(track._ID)
+}
+
+func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	os.Setenv("DBURL", "mongodb://access:paragl1ding_access@ds237363.mlab.com:37363/paragliding_igc")
+	session, err := mgo.Dial(os.Getenv("DBURL"))
+	if err != nil {
+		log.Fatal("Database-connection could not be made: ", err)
+		return
+	}
+	c := session.DB("paragliding_igc").C("tracks")
+	var indexes []jsonTrack
+	err = c.Find(nil).All(&indexes)
+	if err != nil {
+		log.Fatal("Could not find indexes: ", err)
+		return
+	}
+	session.Close()
+	json.NewEncoder(w).Encode(indexes)
+}
+
+func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+/*func getLatestTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}*/
+
+func getTickersHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func getRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func deleteRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func getTrackCountHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+}
+
+func deleteAllTracksHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
 }

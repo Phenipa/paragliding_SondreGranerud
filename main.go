@@ -1,42 +1,35 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/marni/goigc"
+	"github.com/julienschmidt/httprouter"
 )
 
-type metaData struct { //Output for /igcinfo/api
-	Version string `json:"name"`
-	Uptime  string `json:"uptime"`
-	Info    string `json:"info"`
-}
-
-type urlType struct { //Helper-struct to appropriately extract an IGC-url from a POST-request
-	URL string `json:"url"`
-}
-
-type idType struct { //Helper-struct to appropriately respond with the id of a particular track after being posted
-	ID string `json:"id"`
-}
-
-type jsonTrack struct { //Helper-struct to appropriately respond with data about a requested track.
-	Pilot       string  `json:"pilot"`
-	Hdate       string  `json:"h_date"`
-	Glider      string  `json:"glider"`
-	GliderID    string  `json:"glider_id"`
-	TrackLength float64 `json:"track_length"`
-}
-
-var database map[string]igc.Track //-Runs on first startup to set global variables appropriately
-var startTime time.Time           ///
+var startTime time.Time
 
 func main() {
+	os.Setenv("PORT", "8080")
 	startTime = time.Now()
-	database = make(map[string]igc.Track)              //Initializes database
-	http.HandleFunc("/igcinfo/api/", handlerRoot)      //Handles /igcinfo/api/
-	http.HandleFunc("/igcinfo/api/igc/", handlerIndex) //Handles /igcinfo/api/igc/ and its sub-paths
-	http.ListenAndServe(":"+os.Getenv("PORT"), nil)    //Starts the webserver
+	r := httprouter.New()
+	r.GET("/paragliding/api", metaHandler)
+	r.POST("/paragliding/api/track", postTrackHandler)
+	r.GET("/paragliding/api/track", getTracklistHandler)
+	r.GET("/paragliding/api/track/:id", getSingleTrackHandler)
+	r.GET("/paragliding/api/track/:id/:field", getSingleTrackFieldHandler)
+	//r.GET("/paragliding/api/ticker/latest", getLatestTickerHandler)	//Removed as the router does not handle /latest as well as the wildcard /:timestamp
+	r.GET("/paragliding/api/ticker", getTickersHandler)
+	r.GET("/paragliding/api/ticker/:timestamp", getSpecifiedTickerHandler)
+	r.POST("/paragliding/api/webhook/new_track", postNewWebhookHandler)
+	r.GET("/paragliding/api/webhook/new_track/:webhookId", getRegisteredWebhookHandler)
+	r.DELETE("/paragliding/api/webhook/new_track/:webhookId", deleteRegisteredWebhookHandler)
+	r.GET("/admin/api/tracks_count", getTrackCountHandler)
+	r.DELETE("/admin/api/tracks", deleteAllTracksHandler)
+	err := http.ListenAndServe(":"+os.Getenv("PORT"), r) //Starts the webserver
+	if err != nil {
+		log.Fatal("ListenAndServer: ", err)
+	}
 }
