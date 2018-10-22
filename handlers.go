@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/globalsign/mgo"
 	"github.com/julienschmidt/httprouter"
 	igc "github.com/marni/goigc"
 )
@@ -61,33 +59,25 @@ func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Param
 	}
 	track.TrackLength = length
 	track.ID = genUniqueID()
-	session, err := mgo.Dial(os.Getenv("DBURL"))
-	if err != nil {
-		log.Fatal("Database-connection could not be made: ", err)
-		return
-	}
-	c := session.DB("paragliding_igc").C("tracks")
+	postSession := session.Copy()
+	c := postSession.DB(databaseName).C(collectionName)
 	err = c.Insert(track)
 	if err != nil {
 		log.Fatal("Track could not be inserted: ", err)
 	}
-	session.Close()
+	postSession.Close()
 	json.NewEncoder(w).Encode(track.ID)
 }
 
 func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	session, err := mgo.Dial(os.Getenv("DBURL"))
-	if err != nil {
-		log.Fatal("Database-connection could not be made: ", err)
-		return
-	}
-	c := session.DB("paragliding_igc").C("tracks")
+	getTracklistSession := session.Copy()
+	c := getTracklistSession.DB(databaseName).C(collectionName)
 	var indexes []jsonTrack
-	err = c.Find(nil).All(&indexes)
+	err := c.Find(nil).All(&indexes)
 	if err != nil {
 		log.Fatal("Could not find indexes: ", err)
 	}
-	session.Close()
+	getTracklistSession.Close()
 	ids := make([]string, len(indexes))
 	for i := range indexes {
 		ids[i] = indexes[i].ID

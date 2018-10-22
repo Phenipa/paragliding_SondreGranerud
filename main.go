@@ -6,13 +6,27 @@ import (
 	"os"
 	"time"
 
+	"github.com/globalsign/mgo"
 	"github.com/julienschmidt/httprouter"
 )
 
 var startTime time.Time
+var session *mgo.Session
+var databaseName string
+var collectionName string
 
 func main() {
-	os.Setenv("PORT", "8080")
+	databaseName = "paragliding_igc"
+	collectionName = "tracks"
+	session, err := mgo.Dial(os.Getenv("DBURL"))
+	if err != nil {
+		log.Fatal("Database-connection could not be made: ", err)
+		return
+	}
+	err = session.Ping()
+	if err != nil {
+		log.Fatal("Database could not be pinged: ", err)
+	}
 	startTime = time.Now()
 	r := httprouter.New()
 	r.GET("/paragliding/api", metaHandler)
@@ -28,8 +42,8 @@ func main() {
 	r.DELETE("/paragliding/api/webhook/new_track/:webhookId", deleteRegisteredWebhookHandler)
 	r.GET("/admin/api/tracks_count", getTrackCountHandler)
 	r.DELETE("/admin/api/tracks", deleteAllTracksHandler)
-	err := http.ListenAndServe(":"+os.Getenv("PORT"), r) //Starts the webserver
+	err = http.ListenAndServe(":"+os.Getenv("PORT"), r) //Starts the webserver
 	if err != nil {
-		log.Fatal("ListenAndServer: ", err)
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
