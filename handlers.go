@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -67,6 +68,7 @@ func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Param
 		log.Fatal("Track could not be inserted: ", err)
 	}
 	postSession.Close()
+	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(track.ID)
 }
 
@@ -83,6 +85,7 @@ func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 	for i := range indexes {
 		ids[i] = indexes[i].ID
 	}
+	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(ids)
 }
 
@@ -95,6 +98,7 @@ func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
 	getTrackSession.Close()
+	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(result)
 }
 
@@ -109,17 +113,17 @@ func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httpro
 	getTrackfieldSession.Close()
 	switch path := p.ByName("field"); path {
 	case "pilot":
-		json.NewEncoder(w).Encode(result.Pilot)
+		fmt.Fprintln(w, result.Pilot)
 	case "glider":
-		json.NewEncoder(w).Encode(result.Glider)
+		fmt.Fprintln(w, result.Glider)
 	case "glider_id":
-		json.NewEncoder(w).Encode(result.GliderID)
+		fmt.Fprintln(w, result.GliderID)
 	case "track_length":
-		json.NewEncoder(w).Encode(result.TrackLength)
+		fmt.Fprintln(w, result.TrackLength)
 	case "H_date":
-		json.NewEncoder(w).Encode(result.Hdate)
+		fmt.Fprintln(w, result.Hdate)
 	case "track_src_url":
-		json.NewEncoder(w).Encode(result.URL)
+		fmt.Fprintln(w, result.URL)
 	default:
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
