@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/julienschmidt/httprouter"
 	igc "github.com/marni/goigc"
 )
@@ -89,15 +90,39 @@ func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 	getTrackSession := session.Copy()
 	c := getTrackSession.DB(databaseName).C(collectionName)
 	var result jsonTrack
-	err := c.FindId(p.ByName("id")).One(&result)
+	err := c.Find(bson.M{"id": p.ByName("id")}).One(&result)
 	if err != nil {
-		log.Fatal("Could not find provided track: ", err)
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
+	getTrackSession.Close()
 	json.NewEncoder(w).Encode(result)
 }
 
 func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	getTrackfieldSession := session.Copy()
+	c := getTrackfieldSession.DB(databaseName).C(collectionName)
+	var result jsonTrack
+	err := c.Find(bson.M{"id": p.ByName("id")}).One(&result)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	}
+	getTrackfieldSession.Close()
+	switch path := p.ByName("field"); path {
+	case "pilot":
+		json.NewEncoder(w).Encode(result.Pilot)
+	case "glider":
+		json.NewEncoder(w).Encode(result.Glider)
+	case "glider_id":
+		json.NewEncoder(w).Encode(result.GliderID)
+	case "track_length":
+		json.NewEncoder(w).Encode(result.TrackLength)
+	case "H_date":
+		json.NewEncoder(w).Encode(result.Hdate)
+	case "track_src_url":
+		json.NewEncoder(w).Encode(result.URL)
+	default:
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	}
 }
 
 /*func getLatestTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
