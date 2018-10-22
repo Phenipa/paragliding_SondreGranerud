@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/globalsign/mgo"
+	mgo "github.com/globalsign/mgo"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -18,14 +18,11 @@ var collectionName string
 func main() {
 	databaseName = "paragliding_igc"
 	collectionName = "tracks"
-	session, err := mgo.Dial(os.Getenv("DBURL"))
+	var err error
+	session, err = mgo.Dial(os.Getenv("DBURL"))
 	if err != nil {
 		log.Fatal("Database-connection could not be made: ", err)
 		return
-	}
-	err = session.Ping()
-	if err != nil {
-		log.Fatal("Database could not be pinged: ", err)
 	}
 	startTime = time.Now()
 	r := httprouter.New()
