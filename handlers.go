@@ -18,13 +18,13 @@ type metaData struct { //Output for /paragliding/api
 }
 
 type jsonTrack struct { //Helper-struct to appropriately respond with data about a requested track.
-	Pilot       string  `json:"pilot"`
-	Hdate       string  `json:"h_date"`
-	Glider      string  `json:"glider"`
-	GliderID    string  `json:"glider_id"`
-	TrackLength float64 `json:"track_length"`
-	URL         string  `json:"url"`
-	ID          string  `json:"id"`
+	Pilot       string        `json:"pilot"`
+	Hdate       string        `json:"h_date"`
+	Glider      string        `json:"glider"`
+	GliderID    string        `json:"glider_id"`
+	TrackLength float64       `json:"track_length"`
+	URL         string        `json:"url"`
+	ID          bson.ObjectId `json:"id" bson:"_id"`
 }
 
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -60,13 +60,14 @@ func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Param
 		}
 	}
 	track.TrackLength = length
-	track.ID = genUniqueID()
+	track.ID = bson.NewObjectId()
 	postSession := session.Copy()
 	c := postSession.DB(databaseName).C(collectionName)
 	err = c.Insert(track)
 	if err != nil {
 		log.Fatal("Track could not be inserted: ", err)
 	}
+
 	postSession.Close()
 	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(track.ID)
@@ -81,7 +82,7 @@ func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 		log.Fatal("Could not find indexes: ", err)
 	}
 	getTracklistSession.Close()
-	ids := make([]string, len(indexes))
+	ids := make([]interface{}, len(indexes))
 	for i := range indexes {
 		ids[i] = indexes[i].ID
 	}
@@ -138,7 +139,20 @@ func getTickersHandler(w http.ResponseWriter, r *http.Request, p httprouter.Para
 }
 
 func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if p.ByName("timestamp") == "latest" {
+		getLatestTickerSession := session.Copy()
+		c := getLatestTickerSession.DB(databaseName).C(collectionName)
+		var result jsonTrack
+		dbSize, _ := c.Count()
+		err := c.Find(nil).Skip(dbSize - 1).One(&result)
+		if err != nil {
+			log.Fatal("Could not find latest entry: ", err)
+		}
+		getLatestTickerSession.Close()
+		fmt.Fprintln(w, result.ID.Time().Unix())
+	} else {
 
+	}
 }
 
 func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
