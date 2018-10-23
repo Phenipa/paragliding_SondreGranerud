@@ -94,7 +94,7 @@ func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 	getTrackSession := session.Copy()
 	c := getTrackSession.DB(databaseName).C(collectionName)
 	var result jsonTrack
-	err := c.Find(bson.M{"id": p.ByName("id")}).One(&result)
+	err := c.FindId(bson.ObjectIdHex(p.ByName("id"))).One(&result)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
