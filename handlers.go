@@ -206,7 +206,7 @@ func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprou
 		}
 		tm := time.Unix(unixTime, 0)
 		oidtime := bson.NewObjectIdWithTime(tm)
-		err = c.Find(oidtime).Limit(pageSize).All(&result)
+		err = c.Find(bson.M{"_id": bson.M{"$gte": oidtime}}).Limit(pageSize).All(&result)
 		if err != nil {
 			log.Fatal("Could not find entries: ", err)
 		}
