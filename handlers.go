@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/globalsign/mgo/bson"
 	"github.com/julienschmidt/httprouter"
@@ -25,6 +27,14 @@ type jsonTrack struct { //Helper-struct to appropriately respond with data about
 	TrackLength float64       `json:"track_length"`
 	URL         string        `json:"url"`
 	ID          bson.ObjectId `json:"id" bson:"_id"`
+}
+
+type jsonTicker struct {
+	TLatest    int64           `json:"t_latest"`
+	TStart     int64           `json:"t_start"`
+	TStop      int64           `json:"t_stop"`
+	Tracks     []bson.ObjectId `json:"tracks"`
+	Processing time.Duration   `json:"processing"`
 }
 
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -62,26 +72,25 @@ func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Param
 	track.TrackLength = length
 	track.ID = bson.NewObjectId()
 	postSession := session.Copy()
+	defer postSession.Close()
 	c := postSession.DB(databaseName).C(collectionName)
 	err = c.Insert(track)
 	if err != nil {
 		log.Fatal("Track could not be inserted: ", err)
 	}
-
-	postSession.Close()
 	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(track.ID)
 }
 
 func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	getTracklistSession := session.Copy()
+	defer getTracklistSession.Close()
 	c := getTracklistSession.DB(databaseName).C(collectionName)
 	var indexes []jsonTrack
 	err := c.Find(nil).All(&indexes)
 	if err != nil {
 		log.Fatal("Could not find indexes: ", err)
 	}
-	getTracklistSession.Close()
 	ids := make([]interface{}, len(indexes))
 	for i := range indexes {
 		ids[i] = indexes[i].ID
@@ -92,26 +101,26 @@ func getTracklistHandler(w http.ResponseWriter, r *http.Request, p httprouter.Pa
 
 func getSingleTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	getTrackSession := session.Copy()
+	defer getTrackSession.Close()
 	c := getTrackSession.DB(databaseName).C(collectionName)
 	var result jsonTrack
 	err := c.Find(bson.M{"id": p.ByName("id")}).One(&result)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
-	getTrackSession.Close()
 	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(result)
 }
 
 func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	getTrackfieldSession := session.Copy()
+	defer getTrackfieldSession.Close()
 	c := getTrackfieldSession.DB(databaseName).C(collectionName)
 	var result jsonTrack
 	err := c.Find(bson.M{"id": p.ByName("id")}).One(&result)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 	}
-	getTrackfieldSession.Close()
 	switch path := p.ByName("field"); path {
 	case "pilot":
 		fmt.Fprintln(w, result.Pilot)
@@ -130,17 +139,47 @@ func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httpro
 	}
 }
 
-/*func getLatestTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+/*func getLatestTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {	//Removed as the router does not handle /latest as well as the wildcard /:timestamp (overlapping routes)
 
 }*/
 
 func getTickersHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	processStart := time.Now()
+	var tickerResponse jsonTicker
+	getTickerListSession := session.Copy()
+	defer getTickerListSession.Close()
+	c := getTickerListSession.DB(databaseName).C(collectionName)
+	var result [pageSize]jsonTrack
+	var latest jsonTrack
+	var start jsonTrack
+	dbSize, _ := c.Count()
+	err := c.Find(nil).Skip(dbSize - 5).All(&result)
+	if err != nil {
+		log.Fatal("Could not find entries: ", err)
+	}
+	err = c.Find(nil).Skip(dbSize - 1).One(&latest)
+	if err != nil {
+		log.Fatal("Could not find latest entry: ", err)
+	}
+	err = c.Find(nil).One(&start)
+	if err != nil {
+		log.Fatal("Could not find first entry: ", err)
+	}
+	tickerResponse.TLatest = latest.ID.Time().Unix()
+	for i, r := range result {
+		tickerResponse.Tracks[i] = r.ID
+	}
+	tickerResponse.TStart = start.ID.Time().Unix()
+	tickerResponse.TStop = result[pageSize-1].ID.Time().Unix()
+	tickerResponse.Processing = time.Since(processStart) / 1000000  //time.Since returns nanoseconds, dividing it by 1000000 provides the specified unit of milliseconds
+	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
+	json.NewEncoder(w).Encode(tickerResponse)
 }
 
-func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	if p.ByName("timestamp") == "latest" {
+func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) { //Combination of /api/ticker/latest and /api/ticker/<timestamp> as the router does not handle overlapping routes of static and wildcard-types
+	if p.ByName("timestamp") == "latest" { //Handles the path /api/ticker/latest
 		getLatestTickerSession := session.Copy()
+		defer getLatestTickerSession.Close()
 		c := getLatestTickerSession.DB(databaseName).C(collectionName)
 		var result jsonTrack
 		dbSize, _ := c.Count()
@@ -148,10 +187,44 @@ func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprou
 		if err != nil {
 			log.Fatal("Could not find latest entry: ", err)
 		}
-		getLatestTickerSession.Close()
 		fmt.Fprintln(w, result.ID.Time().Unix())
-	} else {
-
+	} else { //Handles the path /api/ticker/<timestamp>
+		processStart := time.Now()
+		var tickerResponse jsonTicker
+		getTickerListSession := session.Copy()
+		defer getTickerListSession.Close()
+		c := getTickerListSession.DB(databaseName).C(collectionName)
+		var result [pageSize]jsonTrack
+		var latest jsonTrack
+		var start jsonTrack
+		dbSize, _ := c.Count()
+		unixTime, err := strconv.ParseInt(p.ByName("timestamp"), 10, 64)
+		if err != nil {
+			log.Fatal("Could not convert timestamp to int: ", err)
+		}
+		tm := time.Unix(unixTime, 0)
+		oidtime := bson.NewObjectIdWithTime(tm)
+		err = c.Find(oidtime).Limit(pageSize).All(&result)
+		if err != nil {
+			log.Fatal("Could not find entries: ", err)
+		}
+		err = c.Find(nil).Skip(dbSize - 1).One(&latest)
+		if err != nil {
+			log.Fatal("Could not find latest entry: ", err)
+		}
+		err = c.Find(nil).One(&start)
+		if err != nil {
+			log.Fatal("Could not find first entry: ", err)
+		}
+		tickerResponse.TLatest = latest.ID.Time().Unix()
+		for i, r := range result {
+			tickerResponse.Tracks[i] = r.ID
+		}
+		tickerResponse.TStart = start.ID.Time().Unix()
+		tickerResponse.TStop = result[pageSize-1].ID.Time().Unix()
+		tickerResponse.Processing = time.Since(processStart) / 1000000  //time.Since returns nanoseconds, dividing it by 1000000 provides the specified unit of milliseconds
+		http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
+		json.NewEncoder(w).Encode(tickerResponse)
 	}
 }
 
