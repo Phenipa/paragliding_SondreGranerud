@@ -1,6 +1,3 @@
-Known bugs:
-  The attempt to GET some URLs without trailing "/" results in an internal server error (notably attempting to get an ID). This is caused by the way I traverse the path, however I have not found an elegant way of handling this.
-  
 Usage:
   When pushed to heroku, this is an api which when recieving POST requests with valid igc-file urls will parse it and put into objects.
   All tracks are saved in memory, and as such are volatile. In heroku, all tracks are deleted after about 30 mins as heroku puts the app to sleep, which deletes all in-memory info
