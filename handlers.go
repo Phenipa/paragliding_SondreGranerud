@@ -146,10 +146,11 @@ func getSingleTrackFieldHandler(w http.ResponseWriter, r *http.Request, p httpro
 func getTickersHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	processStart := time.Now()
 	var tickerResponse jsonTicker
+	tickerResponse.Tracks = make([]bson.ObjectId, pageSize, pageSize)
 	getTickerListSession := session.Copy()
 	defer getTickerListSession.Close()
 	c := getTickerListSession.DB(databaseName).C(collectionName)
-	var result [pageSize]jsonTrack
+	result := make([]jsonTrack, pageSize, pageSize)
 	var latest jsonTrack
 	var start jsonTrack
 	dbSize, _ := c.Count()
@@ -191,10 +192,11 @@ func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprou
 	} else { //Handles the path /api/ticker/<timestamp>
 		processStart := time.Now()
 		var tickerResponse jsonTicker
+		tickerResponse.Tracks = make([]bson.ObjectId, pageSize, pageSize)
 		getTickerListSession := session.Copy()
 		defer getTickerListSession.Close()
 		c := getTickerListSession.DB(databaseName).C(collectionName)
-		var result [pageSize]jsonTrack
+		result := make([]jsonTrack, pageSize, pageSize)
 		var latest jsonTrack
 		var start jsonTrack
 		dbSize, _ := c.Count()
