@@ -13,6 +13,12 @@ import (
 	igc "github.com/marni/goigc"
 )
 
+/*
+---------------------------TODO---------------------------
+Getting /api/ticker and /api/ticker/<timestamp> are so similar, they should be a function which returns the ticker object
+---------------------------TODO---------------------------
+*/
+
 type metaData struct { //Output for /paragliding/api
 	Version string `json:"name"`
 	Uptime  string `json:"uptime"`
