@@ -171,7 +171,7 @@ func getTickersHandler(w http.ResponseWriter, r *http.Request, p httprouter.Para
 		tickerResponse.Tracks[i] = r.ID
 	}
 	tickerResponse.TStart = start.ID.Time().Unix()
-	tickerResponse.TStop = result[pageSize-1].ID.Time().Unix()
+	tickerResponse.TStop = result[len(result)-1].ID.Time().Unix()
 	tickerResponse.Processing = time.Since(processStart) / 1000000  //time.Since returns nanoseconds, dividing it by 1000000 provides the specified unit of milliseconds
 	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	json.NewEncoder(w).Encode(tickerResponse)
