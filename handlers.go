@@ -45,8 +45,9 @@ type jsonTicker struct {
 }
 
 type webhook struct {
-	URL          string `json:"webhookURL"`
-	TriggerValue int64  `json:"minTriggerValue"`
+	URL          string        `json:"webhookURL"`
+	TriggerValue int64         `json:"minTriggerValue"`
+	ID           bson.ObjectId `json:"id" bson:"_id"`
 }
 
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -247,13 +248,18 @@ func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 		http.Error(w, http.StatusText(http.StatusBadRequest)+"\nRequest needs JSON body", http.StatusBadRequest) //Respond that the request needs to be correctly formatted
 	}
 	valid := false
-	var newWebhook webhook
+	exists := false
+	var newWebhook, dupe webhook
 	err := json.NewDecoder(r.Body).Decode(&newWebhook)
+	newWebhook.ID = bson.NewObjectId()
 	if err != nil {
 		log.Fatal("Decoding of URL failed ", err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
+	webhookSession := session.Copy()
+	defer webhookSession.Close()
+	c := webhookSession.DB(databaseName).C(webhookCollection)
 	if strings.Contains(newWebhook.URL, "hooks.slack.com") {
 		valid = true
 	}
@@ -261,16 +267,19 @@ func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 		newWebhook.URL = newWebhook.URL + "/slack"
 		valid = true
 	}
-	if valid {
-		webhookSession := session.Copy()
-		defer webhookSession.Close()
-		c := webhookSession.DB(databaseName).C(webhookCollection)
+	c.Find(bson.M{"url": newWebhook.URL}).One(&dupe)
+	if dupe.URL != "" {
+		exists = true
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+	}
+	if valid && !exists {
 		err = c.Insert(newWebhook)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			log.Fatal("Webhook could not be inserted: ", err)
 		}
-	} else {
+		fmt.Fprintln(w, newWebhook.ID)
+	} else if !exists {
 		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
 	}
 }
@@ -280,12 +289,23 @@ func getRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httpr
 	webhookSession := session.Copy()
 	defer webhookSession.Close()
 	c := webhookSession.DB(databaseName).C(webhookCollection)
-	c.Find(bson.M{"webhookURL": p.ByName("webhookId")}).One(&result)
+	c.FindId(bson.ObjectIdHex(p.ByName("webhookId"))).One(&result)
 	json.NewEncoder(w).Encode(result)
 }
 
 func deleteRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	var result webhook
+	webhookSession := session.Copy()
+	defer webhookSession.Close()
+	c := webhookSession.DB(databaseName).C(webhookCollection)
+	c.FindId(bson.ObjectIdHex(p.ByName("webhookId"))).One(&result)
+	if result.URL != "" {
+		err := c.RemoveId(bson.ObjectIdHex(p.ByName("webhookId")))
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		}
+		json.NewEncoder(w).Encode(result)
+	}
 }
 
 func getTrackCountHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
