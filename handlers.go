@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/globalsign/mgo/bson"
@@ -43,6 +44,11 @@ type jsonTicker struct {
 	Processing time.Duration   `json:"processing"`
 }
 
+type webhook struct {
+	URL          string `json:"webhookURL"`
+	TriggerValue int64  `json:"minTriggerValue"`
+}
+
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	http.Header.Add(w.Header(), "content-type", "application/json") //Set response-header to json reflect that response is json-formatted
 	meta := metaData{"v1.0", uptime(), "Service for IGC tracks."}   //Create an object which contains response
@@ -57,7 +63,7 @@ func postTrackHandler(w http.ResponseWriter, r *http.Request, p httprouter.Param
 	err := json.NewDecoder(r.Body).Decode(&track)
 	if err != nil {
 		log.Fatal("Decoding of URL failed ", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 	trackFile, err := igc.ParseLocation(track.URL)
@@ -237,11 +243,45 @@ func getSpecifiedTickerHandler(w http.ResponseWriter, r *http.Request, p httprou
 }
 
 func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	if r.Header.Get("Content-Type") != "application/json" { //If request is not of type JSON
+		http.Error(w, http.StatusText(http.StatusBadRequest)+"\nRequest needs JSON body", http.StatusBadRequest) //Respond that the request needs to be correctly formatted
+	}
+	valid := false
+	var newWebhook webhook
+	err := json.NewDecoder(r.Body).Decode(&newWebhook)
+	if err != nil {
+		log.Fatal("Decoding of URL failed ", err)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(newWebhook.URL, "hooks.slack.com") {
+		valid = true
+	}
+	if strings.Contains(newWebhook.URL, "discordapp.com") {
+		newWebhook.URL = newWebhook.URL + "/slack"
+		valid = true
+	}
+	if valid {
+		webhookSession := session.Copy()
+		defer webhookSession.Close()
+		c := webhookSession.DB(databaseName).C(webhookCollection)
+		err = c.Insert(newWebhook)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			log.Fatal("Webhook could not be inserted: ", err)
+		}
+	} else {
+		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+	}
 }
 
 func getRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	var result webhook
+	webhookSession := session.Copy()
+	defer webhookSession.Close()
+	c := webhookSession.DB(databaseName).C(webhookCollection)
+	c.Find(bson.M{"webhookURL": p.ByName("webhookId")}).One(&result)
+	json.NewEncoder(w).Encode(result)
 }
 
 func deleteRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
