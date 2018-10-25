@@ -36,11 +36,11 @@ type jsonTrack struct { //Helper-struct to appropriately respond with data about
 }
 
 type jsonTicker struct {
-	TLatest    int64           `json:"t_latest"`
-	TStart     int64           `json:"t_start"`
-	TStop      int64           `json:"t_stop"`
-	Tracks     []bson.ObjectId `json:"tracks"`
-	Processing time.Duration   `json:"processing"`
+	TLatest    int64           `json:"t_latest,omitempty"`
+	TStart     int64           `json:"t_start,omitempty"`
+	TStop      int64           `json:"t_stop,omitempty"`
+	Tracks     []bson.ObjectId `json:"tracks,omitempty"`
+	Processing time.Duration   `json:"processing,omitempty"`
 }
 
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
