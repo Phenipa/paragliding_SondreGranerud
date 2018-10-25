@@ -10,16 +10,18 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-var startTime time.Time   //Starttime of the REST server
-var session *mgo.Session  //Master connection to the database
-var databaseName string   //Name of the database to connect to
-var collectionName string //Name of the collection of the database
+var startTime time.Time      //Starttime of the REST server
+var session *mgo.Session     //Master connection to the database
+var databaseName string      //Name of the database to connect to
+var collectionName string    //Name of the collection of the database
+var webhookCollection string //Name of the collection which contains webhooks
 
 const pageSize int = 5 //Size of the array of tracks returned by /api/ticker
 
 func main() {
 	databaseName = "paragliding_igc" //Name of the database to connect to
 	collectionName = "tracks"        //Name of the collection of the database
+	webhookCollection = "webhooks"
 	var err error
 	session, err = mgo.Dial(os.Getenv("DBURL")) //Master connection to the database
 	if err != nil {
