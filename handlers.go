@@ -45,9 +45,11 @@ type jsonTicker struct {
 }
 
 type webhook struct {
-	URL          string        `json:"webhookURL"`
-	TriggerValue int64         `json:"minTriggerValue"`
-	ID           bson.ObjectId `json:"id" bson:"_id"`
+	URL            string        `json:"webhookURL"`
+	TriggerValue   int64         `json:"minTriggerValue"`
+	TriggerCounter int64         `json:"triggercounter"`
+	PreviousSeenID bson.ObjectId `json:"previoustrigger" bson:"previoustrigger"`
+	ID             bson.ObjectId `json:"id" bson:"_id"`
 }
 
 func metaHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
