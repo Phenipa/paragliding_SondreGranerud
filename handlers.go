@@ -48,7 +48,7 @@ type webhook struct {
 	URL            string        `json:"webhookURL"`
 	TriggerValue   int64         `json:"minTriggerValue"`
 	TriggerCounter int64         `json:"triggercounter"`
-	PreviousSeenID bson.ObjectId `json:"previoustrigger" bson:"previoustrigger"`
+	PreviousSeenID string        `json:"previoustrigger" bson:"previoustrigger"`
 	ID             bson.ObjectId `json:"id" bson:"_id"`
 }
 
