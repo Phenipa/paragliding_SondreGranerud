@@ -1,1 +1,1 @@
-web: paragliding_SondreGranerud
+web: paragliding
