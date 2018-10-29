@@ -311,9 +311,24 @@ func deleteRegisteredWebhookHandler(w http.ResponseWriter, r *http.Request, p ht
 }
 
 func getTrackCountHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	adminsession := session.Copy()
+	defer adminsession.Close()
+	c := adminsession.DB(databaseName).C(collectionName)
+	trackamount, err := c.Count()
+	if err != nil {
+		log.Fatal("Could not find trackcount: ", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+	fmt.Fprintln(w, trackamount)
 }
 
 func deleteAllTracksHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-
+	admindelete := session.Copy()
+	defer admindelete.Close()
+	c := admindelete.DB(databaseName).C(collectionName)
+	removed, err := c.RemoveAll(nil)
+	if err != nil {
+		log.Fatal("Deleting all documents produced an error: ", err)
+	}
+	fmt.Fprintln(w, removed.Removed)
 }
