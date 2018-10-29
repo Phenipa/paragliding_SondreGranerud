@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
+	bson "github.com/globalsign/mgo/bson"
 	"github.com/julienschmidt/httprouter"
 	igc "github.com/marni/goigc"
 )
@@ -254,7 +254,6 @@ func postNewWebhookHandler(w http.ResponseWriter, r *http.Request, p httprouter.
 	var newWebhook, dupe webhook
 	err := json.NewDecoder(r.Body).Decode(&newWebhook)
 	newWebhook.ID = bson.NewObjectId()
-	fmt.Println(newWebhook.ID)
 	if err != nil {
 		log.Fatal("Decoding of URL failed ", err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
